@@ -1,37 +1,89 @@
-// Import Express.js
-const express = require('express');
+require("dotenv").config();
 
-// Create an Express app
+const express = require("express");
+const axios = require("axios");
+
 const app = express();
 
-// Middleware to parse JSON bodies
 app.use(express.json());
 
-// Set port and verify_token
-const port = process.env.PORT || 3000;
-const verifyToken = process.env.VERIFY_TOKEN;
+const PORT = process.env.PORT || 3000;
+const VERIFY_TOKEN = process.env.VERIFY_TOKEN;
 
-// Route for GET requests
-app.get('/', (req, res) => {
-  const { 'hub.mode': mode, 'hub.challenge': challenge, 'hub.verify_token': token } = req.query;
-
-  if (mode === 'subscribe' && token === verifyToken) {
-    console.log('WEBHOOK VERIFIED');
-    res.status(200).send(challenge);
-  } else {
-    res.status(403).end();
-  }
+app.get("/", (req, res) => {
+    res.send("WhatsApp Webhook Running");
 });
 
-// Route for POST requests
-app.post('/', (req, res) => {
-  const timestamp = new Date().toISOString().replace('T', ' ').slice(0, 19);
-  console.log(`\n\nWebhook received ${timestamp}\n`);
-  console.log(JSON.stringify(req.body, null, 2));
-  res.status(200).end();
+app.get("/webhook", (req, res) => {
+
+    const mode = req.query["hub.mode"];
+    const challenge = req.query["hub.challenge"];
+    const token = req.query["hub.verify_token"];
+
+    if (
+        mode === "subscribe" &&
+        token === VERIFY_TOKEN
+    ) {
+        console.log("Webhook Verified");
+        return res.status(200).send(challenge);
+    }
+
+    return res.sendStatus(403);
 });
 
-// Start the server
-app.listen(port, () => {
-  console.log(`\nListening on port ${port}\n`);
+app.post("/webhook", async (req, res) => {
+
+    try {
+
+        const message =
+            req.body.entry?.[0]
+                ?.changes?.[0]
+                ?.value?.messages?.[0];
+
+        if (message) {
+
+            const sender = message.from;
+            const text = message.text?.body;
+
+            console.log("Sender:", sender);
+            console.log("Message:", text);
+
+            await sendMessage(
+                sender,
+                `You said: ${text}`
+            );
+        }
+
+        res.sendStatus(200);
+
+    } catch (error) {
+
+        console.error(error.response?.data || error);
+        res.sendStatus(500);
+    }
+});
+
+async function sendMessage(to, text) {
+
+    await axios.post(
+        `https://graph.facebook.com/v23.0/${process.env.PHONE_NUMBER_ID}/messages`,
+        {
+            messaging_product: "whatsapp",
+            to,
+            type: "text",
+            text: {
+                body: text
+            }
+        },
+        {
+            headers: {
+                Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}`,
+                "Content-Type": "application/json"
+            }
+        }
+    );
+}
+
+app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
 });
