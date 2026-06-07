@@ -196,13 +196,17 @@ app.get('/webhook', (req, res) => {
 // 2. HANDLE INCOMING MESSAGES (POST REQUEST FROM WHATSAPP)
 // ---------------------------------------------------------
 // Notice: We made this function 'async'
-app.post('/webhook', async (req, res) => {
+app.post('/webhook', (req, res) => {
     const body = req.body;
 
+    // Check if this is an event from a WhatsApp API
     if (body.object) {
-        // Return a 200 OK immediately so Meta doesn't think the webhook timed out
-        res.status(200).send('EVENT_RECEIVED');
-
+        
+        // Print the incoming JSON payload to your console so you can see it
+        console.log("\nIncoming webhook:");
+        console.dir(body, { depth: null });
+        
+        // Extract the actual message (if it exists in the payload)
         try {
             const entry = body.entry[0];
             const changes = entry.changes[0];
@@ -211,22 +215,20 @@ app.post('/webhook', async (req, res) => {
             // Check if it's a message
             if (value.messages && value.messages.length > 0) {
                 const message = value.messages[0];
-                const phoneNumber = message.from; // Get SENDER's phone number dynamically
+                const phoneNumber = message.from;
                 
                 if (message.type === 'text') {
                     const textBody = message.text.body;
                     console.log(`\n---> Received message from ${phoneNumber}: ${textBody}`);
-                    
-                    console.log("Fetching news from OpenRouter AI...");
-                    const newsHeadline = await getFootballNewsFromAI();
-                    
-                    console.log(`Sending reply to ${phoneNumber}...`);
-                    await sendWhatsAppMessage(phoneNumber, newsHeadline);
                 }
             }
         } catch (e) {
-            // Ignore status updates
+            // Payload didn't match expected structure, maybe it's a status update (delivered/read)
         }
+
+        // You MUST return a 200 OK back to WhatsApp to acknowledge receipt
+        res.status(200).send('EVENT_RECEIVED');
+        
     } else {
         res.sendStatus(404);
     }
