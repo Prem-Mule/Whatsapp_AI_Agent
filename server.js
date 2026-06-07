@@ -126,9 +126,9 @@ async function getFootballNewsFromAI() {
         });
 
         const data = await response.json();
-        
+        console.log("Ai response",data);
         // Extract the stringified JSON from the AI's response message
-        const aiMessage = data.choices[0].message.content;
+        const aiMessage = data.completion.choices[0].message.content;
         const parsedAIResponse = JSON.parse(aiMessage);
         
         // Return just the headline of the first story
